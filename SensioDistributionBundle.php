@@ -23,10 +23,4 @@ use Sensio\Bundle\DistributionBundle\Configurator\Step\SecretStep;
  */
 class SensioDistributionBundle extends Bundle
 {
-    public function boot()
-    {
-        $configurator = $this->container->get('sensio_distribution.webconfigurator');
-        $configurator->addStep(new DoctrineStep($configurator->getParameters()));
-        $configurator->addStep(new SecretStep($configurator->getParameters()));
-    }
 }

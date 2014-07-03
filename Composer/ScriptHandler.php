@@ -29,8 +29,6 @@ class ScriptHandler
      */
     private static $options = array(
         'symfony-app-dir' => 'app',
-        'symfony-web-dir' => 'web',
-        'symfony-assets-install' => 'hard',
         'symfony-cache-warmup' => false,
     );
 
@@ -49,11 +47,10 @@ class ScriptHandler
 
         $rootDir = __DIR__ . '/../../../../../../..';
         $appDir = $options['symfony-app-dir'];
-        $webDir = $options['symfony-web-dir'];
         $binDir = self::$options['symfony-bin-dir'] = 'bin';
         $varDir = self::$options['symfony-var-dir'] = 'var';
 
-        static::updateDirectoryStructure($event, $rootDir, $appDir, $binDir, $varDir, $webDir);
+        static::updateDirectoryStructure($event, $rootDir, $appDir, $binDir, $varDir);
     }
 
     /**
@@ -116,43 +113,6 @@ class ScriptHandler
     }
 
     /**
-     * Installs the assets under the web root directory.
-     *
-     * For better interoperability, assets are copied instead of symlinked by default.
-     *
-     * Even if symlinks work on Windows, this is only true on Windows Vista and later,
-     * but then, only when running the console with admin rights or when disabling the
-     * strict user permission checks (which can be done on Windows 7 but not on Windows
-     * Vista).
-     *
-     * @param $event CommandEvent A instance
-     */
-    public static function installAssets(CommandEvent $event)
-    {
-        $options = self::getOptions($event);
-        $consoleDir = self::getConsoleDir($event, 'install assets');
-
-        if (null === $consoleDir) {
-            return;
-        }
-
-        $webDir = $options['symfony-web-dir'];
-
-        $symlink = '';
-        if ($options['symfony-assets-install'] == 'symlink') {
-            $symlink = '--symlink ';
-        } elseif ($options['symfony-assets-install'] == 'relative') {
-            $symlink = '--symlink --relative ';
-        }
-
-        if (!self::hasDirectory($event, 'symfony-web-dir', $webDir, 'install assets')) {
-            return;
-        }
-
-        static::executeCommand($event, $consoleDir, 'assets:install '.$symlink.escapeshellarg($webDir));
-    }
-
-    /**
      * Updated the requirements file.
      *
      * @param $event CommandEvent A instance
@@ -182,14 +142,6 @@ class ScriptHandler
             $fs->copy(__DIR__.'/../Resources/skeleton/app/check.php', $binDir.'/symfony_requirements', true);
 
             $fs->dumpFile($binDir.'/symfony_requirements', '#!/usr/bin/env php'.PHP_EOL.str_replace(".'/SymfonyRequirements.php'", ".'/".$fs->makePathRelative($varDir, $binDir)."SymfonyRequirements.php'", file_get_contents($binDir.'/symfony_requirements')), 0755);
-        }
-
-        $webDir = $options['symfony-web-dir'];
-
-        // if the user has already removed the config.php file, do nothing
-        // as the file must be removed for production use
-        if ($fs->exists($webDir.'/config.php')) {
-            $fs->copy(__DIR__.'/../Resources/skeleton/web/config.php', $webDir.'/config.php', true);
         }
     }
 
@@ -404,7 +356,7 @@ namespace { return \$loader; }
         }
     }
 
-    protected static function updateDirectoryStructure(CommandEvent $event, $rootDir, $appDir, $binDir, $varDir, $webDir)
+    protected static function updateDirectoryStructure(CommandEvent $event, $rootDir, $appDir, $binDir, $varDir)
     {
         $event->getIO()->write('Updating Symfony directory structure...');
 
@@ -424,7 +376,6 @@ namespace { return \$loader; }
         }
 
         $gitignore = <<<EOF
-/web/bundles/
 /app/config/parameters.yml
 /var/bootstrap.php.cache
 /var/cache/*
@@ -454,8 +405,6 @@ EOF;
         $composer = str_replace("\"symfony-app-dir\": \"app\",", "\"symfony-app-dir\": \"app\",\n        \"symfony-bin-dir\": \"bin\",\n        \"symfony-var-dir\": \"var\",", file_get_contents($rootDir.'/composer.json'));
         $travis = str_replace("\nscript: phpunit -c app", '', file_get_contents($rootDir.'/.travis.yml'));
 
-        $fs->dumpFile($webDir.'/app.php', str_replace($appDir.'/bootstrap.php.cache', $varDir.'/bootstrap.php.cache', file_get_contents($webDir.'/app.php')));
-        $fs->dumpFile($webDir.'/app_dev.php', str_replace($appDir.'/bootstrap.php.cache', $varDir.'/bootstrap.php.cache', file_get_contents($webDir.'/app_dev.php')));
         $fs->dumpFile($binDir.'/console', str_replace(array(".'/bootstrap.php.cache'", ".'/AppKernel.php'"), array(".'/".$fs->makePathRelative($varDir, $binDir)."bootstrap.php.cache'", ".'/".$fs->makePathRelative($appDir, $binDir)."AppKernel.php'"), file_get_contents($binDir.'/console')));
         $fs->dumpFile($rootDir.'/phpunit.xml.dist', $phpunit);
         $fs->dumpFile($rootDir.'/composer.json', $composer);
@@ -469,8 +418,6 @@ EOF;
     protected static function getOptions(CommandEvent $event)
     {
         $options = array_merge(self::$options, $event->getComposer()->getPackage()->getExtra());
-
-        $options['symfony-assets-install'] = getenv('SYMFONY_ASSETS_INSTALL') ?: $options['symfony-assets-install'];
 
         $options['process-timeout'] = $event->getComposer()->getConfig()->get('process-timeout');
 
